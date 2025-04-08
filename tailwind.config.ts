@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,16 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+        // FloraSense custom colors
+        flora: {
+          green: '#4CAF50',
+          blue: '#03A9F4',
+          orange: '#FF9800',
+          red: '#F44336',
+          light: '#F5F9FF',
+          dark: '#2C3E50',
+        },
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +94,27 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+        'pulse-soft': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
+        },
+        'fade-in-up': {
+          '0%': { 
+            opacity: '0',
+            transform: 'translateY(10px)'
+          },
+          '100%': { 
+            opacity: '1',
+            transform: 'translateY(0)'
+          },
+        },
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+        'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
+        'fade-in-up': 'fade-in-up 0.5s ease-out',
 			}
 		}
 	},
