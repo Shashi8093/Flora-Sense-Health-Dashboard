@@ -29,14 +29,14 @@ const insights: InsightProps[] = [
   {
     id: 3,
     title: 'Heart rate variability',
-    description: 'Your HRV indicates good recovery from yesterday's workout.',
+    description: "Your HRV indicates good recovery from yesterday's workout.",
     type: 'positive',
     time: '12h ago'
   },
   {
     id: 4,
     title: 'Hydration reminder',
-    description: 'You've consumed only 60% of your daily water goal.',
+    description: "You've consumed only 60% of your daily water goal.",
     type: 'negative',
     time: '1d ago'
   }
