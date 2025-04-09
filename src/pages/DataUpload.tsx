@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -18,6 +17,7 @@ interface UploadHistoryItem {
   uploadDate: string;
   status: 'success' | 'failed';
   fileType: string;
+  report?: any;
 }
 
 const DataUpload = () => {
@@ -30,7 +30,6 @@ const DataUpload = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Load upload history from localStorage on component mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('uploadHistory');
     if (savedHistory) {
@@ -96,10 +95,8 @@ const DataUpload = () => {
       return;
     }
 
-    // Start the upload process
     setUploadStatus('uploading');
     
-    // Simulate upload progress
     let progress = 0;
     const interval = setInterval(() => {
       progress += 5;
@@ -109,28 +106,31 @@ const DataUpload = () => {
         clearInterval(interval);
         setUploadStatus('processing');
         
-        // Simulate processing of files
         setTimeout(() => {
           try {
-            // Process the uploaded files (in a real app, this would parse the files)
             const processedData = processHealthData(files);
             console.log("Processed data:", processedData);
             
-            // Add to upload history
             const newHistoryItems: UploadHistoryItem[] = files.map(file => ({
               id: Date.now() + Math.random().toString(36).substring(2, 9),
               fileName: file.name,
               fileSize: file.size,
               uploadDate: new Date().toISOString(),
               status: 'success',
-              fileType: file.name.split('.').pop()?.toLowerCase() || 'unknown'
+              fileType: file.name.split('.').pop()?.toLowerCase() || 'unknown',
+              report: processedData
             }));
             
             const updatedHistory = [...newHistoryItems, ...uploadHistory];
             setUploadHistory(updatedHistory);
             
-            // Save to localStorage
             localStorage.setItem('uploadHistory', JSON.stringify(updatedHistory));
+            localStorage.setItem('latestReport', JSON.stringify({
+              reportId: newHistoryItems[0].id,
+              data: processedData,
+              fileName: files[0].name,
+              uploadDate: new Date().toISOString()
+            }));
             
             setUploadStatus('success');
             toast({
@@ -138,7 +138,6 @@ const DataUpload = () => {
               description: `${files.length} file${files.length > 1 ? 's' : ''} processed successfully.`,
             });
             
-            // Navigate to dashboard after successful upload
             setTimeout(() => {
               navigate('/dashboard');
             }, 2000);
@@ -172,6 +171,26 @@ const DataUpload = () => {
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
+
+  const viewReport = (reportId: string) => {
+    const report = uploadHistory.find(item => item.id === reportId);
+    if (report && report.report) {
+      localStorage.setItem('currentReport', JSON.stringify({
+        reportId: report.id,
+        data: report.report,
+        fileName: report.fileName,
+        uploadDate: report.uploadDate
+      }));
+      
+      navigate('/insights');
+    } else {
+      toast({
+        title: "Report not found",
+        description: "The report data could not be found.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -420,7 +439,13 @@ const DataUpload = () => {
                           </div>
                         </div>
                         <div className="mt-2 flex justify-end space-x-2">
-                          <Button variant="outline" size="sm">View Report</Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => viewReport(item.id)}
+                          >
+                            View Report
+                          </Button>
                           <Button variant="ghost" size="sm">Delete</Button>
                         </div>
                       </div>

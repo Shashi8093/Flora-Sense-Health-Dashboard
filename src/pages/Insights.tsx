@@ -1,13 +1,25 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import HealthInsights from '@/components/HealthInsights';
+import HealthDataReport from '@/components/HealthDataReport';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain, Heart, Activity, AlertTriangle, BarChart, TrendingUp, TrendingDown } from 'lucide-react';
+import { Brain, Heart, Activity, AlertTriangle, BarChart, TrendingUp, TrendingDown, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+
+interface HealthReport {
+  reportId: string;
+  data: any;
+  fileName: string;
+  uploadDate: string;
+}
 
 const Insights = () => {
+  const [activeTab, setActiveTab] = useState('all');
+  const [currentReport, setCurrentReport] = useState<HealthReport | null>(null);
+  const { toast } = useToast();
+
   const recommendationData = [
     {
       id: 1,
@@ -69,6 +81,34 @@ const Insights = () => {
     }
   ];
 
+  useEffect(() => {
+    const reportData = localStorage.getItem('currentReport');
+    if (reportData) {
+      try {
+        const report = JSON.parse(reportData);
+        setCurrentReport(report);
+        setActiveTab('report');
+        localStorage.removeItem('currentReport');
+      } catch (error) {
+        console.error('Error parsing report data:', error);
+        toast({
+          title: "Error Loading Report",
+          description: "There was a problem loading the report data.",
+          variant: "destructive",
+        });
+      }
+    }
+    
+    const latestReport = localStorage.getItem('latestReport');
+    if (latestReport) {
+      try {
+        setCurrentReport(JSON.parse(latestReport));
+      } catch (error) {
+        console.error('Error parsing latest report data:', error);
+      }
+    }
+  }, [toast]);
+
   const getImpactBadge = (impact: string) => {
     switch (impact) {
       case 'high':
@@ -103,12 +143,21 @@ const Insights = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Health Insights</h1>
         <p className="text-gray-600 mb-6">AI-powered analysis and recommendations based on your health data</p>
         
-        <Tabs defaultValue="all" className="mb-8">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mb-8">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="all">All Insights</TabsTrigger>
             <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
             <TabsTrigger value="trends">Trends</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
+            <TabsTrigger value="report" className="relative">
+              Report
+              {currentReport && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flora-green opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-flora-green"></span>
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="all" className="mt-6">
@@ -316,6 +365,45 @@ const Insights = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="report" className="mt-6">
+            {currentReport ? (
+              <HealthDataReport 
+                reportData={currentReport.data} 
+                fileName={currentReport.fileName}
+                uploadDate={currentReport.uploadDate}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="mr-2 h-5 w-5 text-gray-500" />
+                    Health Data Report
+                  </CardTitle>
+                  <CardDescription>
+                    View detailed analysis from your uploaded health data
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-12">
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                      <FileText className="h-6 w-6 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium mb-2">No Reports Available</h3>
+                    <p className="text-gray-600 max-w-md mx-auto mb-4">
+                      Upload health data files to generate detailed AI-powered analysis and insights.
+                    </p>
+                    <Button 
+                      className="bg-flora-green hover:bg-flora-green/90 text-white"
+                      onClick={() => window.location.href = '/upload'}
+                    >
+                      Upload Health Data
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
