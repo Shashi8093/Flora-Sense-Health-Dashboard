@@ -1,24 +1,42 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, FileUp, Check, AlertCircle } from 'lucide-react';
+import { Upload, FileUp, Check, AlertCircle, ArrowLeft, Clock } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { processHealthData } from '@/utils/dataProcessor';
 
+interface UploadHistoryItem {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  uploadDate: string;
+  status: 'success' | 'failed';
+  fileType: string;
+}
+
 const DataUpload = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
   const [activeTab, setActiveTab] = useState('upload');
+  const [uploadHistory, setUploadHistory] = useState<UploadHistoryItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Load upload history from localStorage on component mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('uploadHistory');
+    if (savedHistory) {
+      setUploadHistory(JSON.parse(savedHistory));
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -98,6 +116,22 @@ const DataUpload = () => {
             const processedData = processHealthData(files);
             console.log("Processed data:", processedData);
             
+            // Add to upload history
+            const newHistoryItems: UploadHistoryItem[] = files.map(file => ({
+              id: Date.now() + Math.random().toString(36).substring(2, 9),
+              fileName: file.name,
+              fileSize: file.size,
+              uploadDate: new Date().toISOString(),
+              status: 'success',
+              fileType: file.name.split('.').pop()?.toLowerCase() || 'unknown'
+            }));
+            
+            const updatedHistory = [...newHistoryItems, ...uploadHistory];
+            setUploadHistory(updatedHistory);
+            
+            // Save to localStorage
+            localStorage.setItem('uploadHistory', JSON.stringify(updatedHistory));
+            
             setUploadStatus('success');
             toast({
               title: "Upload successful",
@@ -129,12 +163,34 @@ const DataUpload = () => {
     setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    else return (bytes / 1048576).toFixed(1) + ' MB';
+  };
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       
       <div className="max-w-7xl mx-auto pt-6 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Data Upload</h1>
+        <div className="flex items-center mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="mr-2"
+            onClick={() => navigate('/dashboard')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Dashboard
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Data Upload</h1>
+        </div>
         <p className="text-gray-600 mb-6">Upload your health data files to analyze and visualize your health metrics</p>
         
         <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab}>
@@ -238,7 +294,7 @@ const DataUpload = () => {
                               </div>
                               <div className="ml-3">
                                 <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                                <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                               </div>
                             </div>
                             <button 
@@ -330,9 +386,58 @@ const DataUpload = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No previous uploads found</p>
-                </div>
+                {uploadHistory.length > 0 ? (
+                  <div className="divide-y divide-gray-200">
+                    {uploadHistory.map((item) => (
+                      <div key={item.id} className="py-4 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center">
+                            <div className={`p-2 rounded-full ${
+                              item.fileType === 'csv' ? 'bg-green-100' : 'bg-blue-100'
+                            }`}>
+                              <FileUp className={`h-4 w-4 ${
+                                item.fileType === 'csv' ? 'text-green-600' : 'text-blue-600'
+                              }`} />
+                            </div>
+                            <div className="ml-3">
+                              <h4 className="text-sm font-medium text-gray-900">{item.fileName}</h4>
+                              <div className="flex items-center mt-1">
+                                <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                                <span className="text-xs text-gray-500">{formatDate(item.uploadDate)}</span>
+                                <span className="mx-2 text-gray-300">•</span>
+                                <span className="text-xs text-gray-500">{formatFileSize(item.fileSize)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              item.status === 'success' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {item.status === 'success' ? 'Processed' : 'Failed'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex justify-end space-x-2">
+                          <Button variant="outline" size="sm">View Report</Button>
+                          <Button variant="ghost" size="sm">Delete</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No previous uploads found</p>
+                    <Button 
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => setActiveTab('upload')}
+                    >
+                      Upload New Files
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
