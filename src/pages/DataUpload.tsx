@@ -1,14 +1,21 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, FileUp, Check, AlertCircle, ArrowLeft, Clock } from 'lucide-react';
+import { Upload, FileUp, Check, AlertCircle, ArrowLeft, Clock, Download, FileText, FileJson } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { processHealthData } from '@/utils/dataProcessor';
+import { processHealthData, generateDownloadableReport, generatePdfReport } from '@/utils/dataProcessor';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UploadHistoryItem {
   id: string;
@@ -139,7 +146,7 @@ const DataUpload = () => {
             });
             
             setTimeout(() => {
-              navigate('/dashboard');
+              navigate('/insights');
             }, 2000);
           } catch (error) {
             setUploadStatus('error');
@@ -191,6 +198,73 @@ const DataUpload = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const downloadReport = async (reportId: string, format: 'json' | 'pdf' | 'csv') => {
+    const report = uploadHistory.find(item => item.id === reportId);
+    if (!report || !report.report) {
+      toast({
+        title: "Report not found",
+        description: "The report data could not be found for download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      let url;
+      let fileExtension;
+      
+      if (format === 'json') {
+        url = generateDownloadableReport(report.report, report.fileName);
+        fileExtension = 'json';
+      } else if (format === 'pdf') {
+        url = await generatePdfReport(report.report, report.fileName);
+        fileExtension = 'txt'; // Using txt as we don't have actual PDF generation
+      } else {
+        // CSV format would be implemented here
+        toast({
+          title: "Format not supported",
+          description: "CSV format is not yet supported.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create a download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `health-report-${report.id.substring(0, 8)}.${fileExtension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL object
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      toast({
+        title: "Download started",
+        description: `Your report is being downloaded as ${fileExtension.toUpperCase()}.`,
+      });
+    } catch (error) {
+      console.error("Error generating download:", error);
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your download.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteHistoryItem = (reportId: string) => {
+    const updatedHistory = uploadHistory.filter(item => item.id !== reportId);
+    setUploadHistory(updatedHistory);
+    localStorage.setItem('uploadHistory', JSON.stringify(updatedHistory));
+    
+    toast({
+      title: "Report deleted",
+      description: "The report has been removed from your history.",
+    });
   };
 
   return (
@@ -401,7 +475,7 @@ const DataUpload = () => {
               <CardHeader>
                 <CardTitle>Upload History</CardTitle>
                 <CardDescription>
-                  Review your previous data uploads
+                  Review your previous data uploads and access your health reports
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -444,9 +518,36 @@ const DataUpload = () => {
                             size="sm"
                             onClick={() => viewReport(item.id)}
                           >
+                            <FileText className="h-4 w-4 mr-1" />
                             View Report
                           </Button>
-                          <Button variant="ghost" size="sm">Delete</Button>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Download className="h-4 w-4 mr-1" />
+                                Download
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => downloadReport(item.id, 'json')}>
+                                <FileJson className="h-4 w-4 mr-2" />
+                                <span>Download as JSON</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => downloadReport(item.id, 'pdf')}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                <span>Download as Report</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => deleteHistoryItem(item.id)}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     ))}

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -15,10 +15,13 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { Brain, Heart, Activity, Clock, Calendar, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Brain, Heart, Activity, Clock, Calendar, TrendingUp, AlertTriangle, Download, Share2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { generateDownloadableReport, generatePdfReport } from '@/utils/dataProcessor';
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from 'react-router-dom';
 
 interface HealthDataReportProps {
   reportData: any;
@@ -27,6 +30,10 @@ interface HealthDataReportProps {
 }
 
 const HealthDataReport: React.FC<HealthDataReportProps> = ({ reportData, fileName, uploadDate }) => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
   const formattedDate = new Date(uploadDate).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -38,129 +45,74 @@ const HealthDataReport: React.FC<HealthDataReportProps> = ({ reportData, fileNam
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
   // AI Analysis section - extract insights from the data
-  const generateInsights = (data: any) => {
-    const insights = [];
-    
-    // Heart rate insights
-    if (data.heartRate) {
-      const { average, min, max, resting } = data.heartRate;
+  const insights = reportData.insights || generateInsights(reportData);
+
+  const handleDownload = async (format: 'json' | 'pdf') => {
+    try {
+      let url;
+      let fileExtension;
       
-      if (average > 80) {
-        insights.push({
-          title: 'Elevated Heart Rate',
-          description: `Your average heart rate of ${average} BPM is above the typical resting range. Consider regular cardiovascular exercise and stress management.`,
-          type: 'warning',
-          icon: <Heart className="h-5 w-5 text-red-500" />
-        });
-      } else if (average < 60) {
-        insights.push({
-          title: 'Low Heart Rate',
-          description: `Your average heart rate of ${average} BPM is below typical. This could indicate good cardiovascular fitness or potentially require medical attention.`,
-          type: 'info',
-          icon: <Heart className="h-5 w-5 text-blue-500" />
-        });
+      if (format === 'json') {
+        url = generateDownloadableReport(reportData, fileName);
+        fileExtension = 'json';
       } else {
-        insights.push({
-          title: 'Healthy Heart Rate',
-          description: `Your average heart rate of ${average} BPM is within the healthy range.`,
-          type: 'positive',
-          icon: <Heart className="h-5 w-5 text-green-500" />
-        });
+        url = await generatePdfReport(reportData, fileName);
+        fileExtension = 'txt'; // Using txt as we don't have actual PDF generation
       }
+      
+      // Create a download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `health-report-${Date.now()}.${fileExtension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL object
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      toast({
+        title: "Download started",
+        description: `Your report is being downloaded as ${fileExtension.toUpperCase()}.`,
+      });
+    } catch (error) {
+      console.error("Error generating download:", error);
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your download.",
+        variant: "destructive",
+      });
     }
-    
-    // Sleep insights
-    if (data.sleep) {
-      const { averageDuration, efficiency } = data.sleep;
-      
-      if (averageDuration < 7) {
-        insights.push({
-          title: 'Insufficient Sleep',
-          description: `Your average sleep duration of ${averageDuration} hours is below the recommended 7-9 hours for adults. Consider adjusting your sleep schedule.`,
-          type: 'warning',
-          icon: <Brain className="h-5 w-5 text-orange-500" />
-        });
-      } else {
-        insights.push({
-          title: 'Healthy Sleep Duration',
-          description: `Your average sleep duration of ${averageDuration} hours meets the recommended guidelines for adults.`,
-          type: 'positive',
-          icon: <Brain className="h-5 w-5 text-green-500" />
-        });
-      }
-      
-      if (efficiency < 85) {
-        insights.push({
-          title: 'Sleep Efficiency Concerns',
-          description: `Your sleep efficiency of ${efficiency}% is below optimal. Consider limiting screen time before bed and maintaining a consistent sleep schedule.`,
-          type: 'warning',
-          icon: <Brain className="h-5 w-5 text-orange-500" />
-        });
-      }
-    }
-    
-    // Activity insights
-    if (data.activity) {
-      const { averageSteps, averageActiveMinutes } = data.activity;
-      
-      if (averageSteps < 7500) {
-        insights.push({
-          title: 'Increase Daily Steps',
-          description: `Your average of ${averageSteps} steps per day is below the recommended 10,000 steps. Try to incorporate more walking into your daily routine.`,
-          type: 'warning',
-          icon: <Activity className="h-5 w-5 text-orange-500" />
-        });
-      } else {
-        insights.push({
-          title: 'Good Activity Level',
-          description: `Your average of ${averageSteps} steps per day shows you're maintaining an active lifestyle.`,
-          type: 'positive',
-          icon: <Activity className="h-5 w-5 text-green-500" />
-        });
-      }
-      
-      if (averageActiveMinutes < 30) {
-        insights.push({
-          title: 'Increase Active Minutes',
-          description: `Your average of ${averageActiveMinutes} active minutes per day is below the recommended 30 minutes of moderate activity.`,
-          type: 'warning',
-          icon: <Activity className="h-5 w-5 text-orange-500" />
-        });
-      }
-    }
-    
-    // Blood pressure insights
-    if (data.bloodPressure) {
-      const { averageSystolic, averageDiastolic } = data.bloodPressure;
-      
-      if (averageSystolic > 130 || averageDiastolic > 80) {
-        insights.push({
-          title: 'Elevated Blood Pressure',
-          description: `Your average blood pressure of ${averageSystolic}/${averageDiastolic} mmHg is above the normal range. Consider diet modifications and regular exercise.`,
-          type: 'warning',
-          icon: <AlertTriangle className="h-5 w-5 text-red-500" />
-        });
-      } else {
-        insights.push({
-          title: 'Healthy Blood Pressure',
-          description: `Your average blood pressure of ${averageSystolic}/${averageDiastolic} mmHg is within the normal range.`,
-          type: 'positive',
-          icon: <TrendingUp className="h-5 w-5 text-green-500" />
-        });
-      }
-    }
-    
-    return insights;
   };
 
-  const insights = generateInsights(reportData);
+  const handleShare = () => {
+    toast({
+      title: "Share feature",
+      description: "This would allow sharing with healthcare providers (feature coming soon).",
+    });
+  };
+
+  const handleBackToHistory = () => {
+    navigate('/upload');
+  };
 
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Health Data Report</h2>
+            <div className="flex items-center">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="mr-2 -ml-2" 
+                onClick={handleBackToHistory}
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to History
+              </Button>
+              <h2 className="text-xl font-semibold text-gray-900">Health Data Report</h2>
+            </div>
             <div className="flex items-center mt-1">
               <div className="flex items-center mr-4">
                 <Calendar className="h-4 w-4 text-gray-400 mr-1" />
@@ -172,16 +124,30 @@ const HealthDataReport: React.FC<HealthDataReportProps> = ({ reportData, fileNam
               </div>
             </div>
           </div>
-          <div className="flex items-center">
-            <div className="bg-indigo-100 p-2 rounded-full">
-              <Brain className="h-5 w-5 text-indigo-600" />
-            </div>
-            <span className="ml-2 text-sm font-medium text-indigo-600">AI Analysis</span>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center" 
+              onClick={() => handleDownload('json')}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center"
+              onClick={handleShare}
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              Share
+            </Button>
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="mb-6">
+      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="heart">Heart Rate</TabsTrigger>
@@ -507,12 +473,116 @@ const HealthDataReport: React.FC<HealthDataReportProps> = ({ reportData, fileNam
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-center mt-6">
-        <Button variant="outline" className="mr-2">Download Report PDF</Button>
-        <Button className="bg-flora-green hover:bg-flora-green/90 text-white">Share with Healthcare Provider</Button>
+      <div className="flex justify-center mt-6 space-x-4">
+        <Button variant="outline" onClick={() => handleDownload('pdf')}>
+          <Download className="h-4 w-4 mr-2" />
+          Download Report PDF
+        </Button>
+        <Button className="bg-flora-green hover:bg-flora-green/90 text-white" onClick={handleShare}>
+          <Share2 className="h-4 w-4 mr-2" />
+          Share with Healthcare Provider
+        </Button>
       </div>
     </div>
   );
+};
+
+// Helper function to generate insights if not available in report data
+const generateInsights = (data: any) => {
+  const insights = [];
+  
+  // Heart rate insights
+  if (data.heartRate) {
+    const { average, min, max, resting } = data.heartRate;
+    
+    if (average > 80) {
+      insights.push({
+        title: 'Elevated Heart Rate',
+        description: `Your average heart rate of ${average} BPM is above the typical resting range. Consider regular cardiovascular exercise and stress management.`,
+        type: 'warning',
+        icon: <Heart className="h-5 w-5 text-red-500" />
+      });
+    } else if (average < 60) {
+      insights.push({
+        title: 'Low Heart Rate',
+        description: `Your average heart rate of ${average} BPM is below typical. This could indicate good cardiovascular fitness or potentially require medical attention.`,
+        type: 'info',
+        icon: <Heart className="h-5 w-5 text-blue-500" />
+      });
+    } else {
+      insights.push({
+        title: 'Healthy Heart Rate',
+        description: `Your average heart rate of ${average} BPM is within the healthy range.`,
+        type: 'positive',
+        icon: <Heart className="h-5 w-5 text-green-500" />
+      });
+    }
+  }
+  
+  // Sleep insights
+  if (data.sleep) {
+    const { averageDuration, efficiency } = data.sleep;
+    
+    if (averageDuration < 7) {
+      insights.push({
+        title: 'Insufficient Sleep',
+        description: `Your average sleep duration of ${averageDuration} hours is below the recommended 7-9 hours for adults. Consider adjusting your sleep schedule.`,
+        type: 'warning',
+        icon: <Brain className="h-5 w-5 text-orange-500" />
+      });
+    } else {
+      insights.push({
+        title: 'Healthy Sleep Duration',
+        description: `Your average sleep duration of ${averageDuration} hours meets the recommended guidelines for adults.`,
+        type: 'positive',
+        icon: <Brain className="h-5 w-5 text-green-500" />
+      });
+    }
+  }
+  
+  // Activity insights
+  if (data.activity) {
+    const { averageSteps, averageActiveMinutes } = data.activity;
+    
+    if (averageSteps < 7500) {
+      insights.push({
+        title: 'Increase Daily Steps',
+        description: `Your average of ${averageSteps} steps per day is below the recommended 10,000 steps. Try to incorporate more walking into your daily routine.`,
+        type: 'warning',
+        icon: <Activity className="h-5 w-5 text-orange-500" />
+      });
+    } else {
+      insights.push({
+        title: 'Good Activity Level',
+        description: `Your average of ${averageSteps} steps per day shows you're maintaining an active lifestyle.`,
+        type: 'positive',
+        icon: <Activity className="h-5 w-5 text-green-500" />
+      });
+    }
+  }
+  
+  // Blood pressure insights
+  if (data.bloodPressure) {
+    const { averageSystolic, averageDiastolic } = data.bloodPressure;
+    
+    if (averageSystolic > 130 || averageDiastolic > 80) {
+      insights.push({
+        title: 'Elevated Blood Pressure',
+        description: `Your average blood pressure of ${averageSystolic}/${averageDiastolic} mmHg is above the normal range. Consider diet modifications and regular exercise.`,
+        type: 'warning',
+        icon: <AlertTriangle className="h-5 w-5 text-red-500" />
+      });
+    } else {
+      insights.push({
+        title: 'Healthy Blood Pressure',
+        description: `Your average blood pressure of ${averageSystolic}/${averageDiastolic} mmHg is within the normal range.`,
+        type: 'positive',
+        icon: <TrendingUp className="h-5 w-5 text-green-500" />
+      });
+    }
+  }
+  
+  return insights;
 };
 
 export default HealthDataReport;

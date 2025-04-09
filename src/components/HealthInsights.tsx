@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { Brain, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Brain, TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface InsightProps {
   id: number;
@@ -11,7 +12,8 @@ interface InsightProps {
   time: string;
 }
 
-const insights: InsightProps[] = [
+// Default insights to show when no data is available
+const defaultInsights: InsightProps[] = [
   {
     id: 1,
     title: 'Sleep quality improved',
@@ -43,6 +45,23 @@ const insights: InsightProps[] = [
 ];
 
 const HealthInsights = () => {
+  const [insights, setInsights] = useState<InsightProps[]>(defaultInsights);
+  const [userNote, setUserNote] = useState('');
+  const [showNoteInput, setShowNoteInput] = useState(false);
+
+  useEffect(() => {
+    // Check for dynamic insights in localStorage
+    const dynamicInsights = localStorage.getItem('dynamicInsights');
+    if (dynamicInsights) {
+      try {
+        const parsedInsights = JSON.parse(dynamicInsights);
+        setInsights(parsedInsights);
+      } catch (error) {
+        console.error("Error parsing dynamic insights", error);
+      }
+    }
+  }, []);
+
   const getIcon = (type: string) => {
     switch (type) {
       case 'positive':
@@ -68,6 +87,24 @@ const HealthInsights = () => {
         return 'bg-blue-50';
     }
   };
+
+  const handleAddNote = () => {
+    if (userNote.trim()) {
+      const newInsight: InsightProps = {
+        id: Date.now(),
+        title: 'User Note',
+        description: userNote,
+        type: 'neutral',
+        time: 'Just now'
+      };
+      
+      const updatedInsights = [newInsight, ...insights];
+      setInsights(updatedInsights);
+      localStorage.setItem('dynamicInsights', JSON.stringify(updatedInsights));
+      setUserNote('');
+      setShowNoteInput(false);
+    }
+  };
   
   return (
     <div>
@@ -88,7 +125,7 @@ const HealthInsights = () => {
               <div className="flex-shrink-0 mt-0.5">
                 {getIcon(insight.type)}
               </div>
-              <div className="ml-3">
+              <div className="ml-3 flex-grow">
                 <h3 className="text-sm font-medium">{insight.title}</h3>
                 <p className="mt-1 text-sm text-gray-600">{insight.description}</p>
                 <div className="mt-2 text-xs text-gray-500">{insight.time}</div>
@@ -98,11 +135,37 @@ const HealthInsights = () => {
         ))}
       </div>
       
-      <div className="mt-6">
-        <Button className="w-full" variant="outline">
-          View All Insights
-        </Button>
-      </div>
+      {showNoteInput ? (
+        <div className="mt-4 space-y-2">
+          <Textarea 
+            placeholder="Add your own health observation or note..." 
+            value={userNote} 
+            onChange={(e) => setUserNote(e.target.value)}
+            className="min-h-[100px]"
+          />
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" size="sm" onClick={() => setShowNoteInput(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleAddNote}>Add Note</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6 space-y-2">
+          <Button 
+            className="w-full" 
+            variant="outline" 
+            onClick={() => window.location.href = '/insights'}
+          >
+            View All Insights
+          </Button>
+          <Button 
+            className="w-full" 
+            variant="ghost" 
+            onClick={() => setShowNoteInput(true)}
+          >
+            Add Your Own Note
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
