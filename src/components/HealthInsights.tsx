@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Brain, TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react';
+import { Brain, TrendingUp, TrendingDown, AlertTriangle, Download, Share2, FileText, Info } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 interface InsightProps {
   id: number;
@@ -10,6 +11,7 @@ interface InsightProps {
   description: string;
   type: 'positive' | 'negative' | 'neutral' | 'warning';
   time: string;
+  detail?: string;
 }
 
 // Default insights to show when no data is available
@@ -19,28 +21,32 @@ const defaultInsights: InsightProps[] = [
     title: 'Sleep quality improved',
     description: 'Your sleep duration and quality have improved by 15% this week.',
     type: 'positive',
-    time: '2h ago'
+    time: '2h ago',
+    detail: 'Your deep sleep has increased from 1.2 to 1.8 hours per night, which is associated with better cognitive function and memory consolidation. Continue maintaining a consistent sleep schedule.'
   },
   {
     id: 2,
     title: 'Increased stress detected',
     description: 'Your stress levels have increased during work hours. Consider short breaks.',
     type: 'warning',
-    time: '5h ago'
+    time: '5h ago',
+    detail: 'Heart rate variability analysis shows increased stress patterns between 2-4pm on workdays. Try implementing 5-minute mindfulness exercises or short walks during this period.'
   },
   {
     id: 3,
     title: 'Heart rate variability',
     description: "Your HRV indicates good recovery from yesterday's workout.",
     type: 'positive',
-    time: '12h ago'
+    time: '12h ago',
+    detail: 'Your HRV has increased by 8ms compared to your baseline, indicating effective recovery. Your body is adapting well to your current training load.'
   },
   {
     id: 4,
     title: 'Hydration reminder',
     description: "You've consumed only 60% of your daily water goal.",
     type: 'negative',
-    time: '1d ago'
+    time: '1d ago',
+    detail: 'Consistent under-hydration may impact cognitive performance and recovery. Try setting hourly reminders or use a marked water bottle to track intake throughout the day.'
   }
 ];
 
@@ -48,6 +54,8 @@ const HealthInsights = () => {
   const [insights, setInsights] = useState<InsightProps[]>(defaultInsights);
   const [userNote, setUserNote] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
+  const [expandedInsight, setExpandedInsight] = useState<number | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check for dynamic insights in localStorage
@@ -103,7 +111,27 @@ const HealthInsights = () => {
       localStorage.setItem('dynamicInsights', JSON.stringify(updatedInsights));
       setUserNote('');
       setShowNoteInput(false);
+      
+      toast({
+        title: "Note added",
+        description: "Your health note has been added to your insights.",
+      });
     }
+  };
+  
+  const toggleInsightDetail = (id: number) => {
+    if (expandedInsight === id) {
+      setExpandedInsight(null);
+    } else {
+      setExpandedInsight(id);
+    }
+  };
+  
+  const handleShareInsight = (insight: InsightProps) => {
+    toast({
+      title: "Insight shared",
+      description: "This insight has been shared with your healthcare provider.",
+    });
   };
   
   return (
@@ -120,15 +148,50 @@ const HealthInsights = () => {
       
       <div className="space-y-4">
         {insights.map((insight) => (
-          <div key={insight.id} className={`p-4 rounded-lg ${getBackgroundColor(insight.type)}`}>
+          <div key={insight.id} className={`p-4 rounded-lg ${getBackgroundColor(insight.type)} transition-all duration-200`}>
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-0.5">
                 {getIcon(insight.type)}
               </div>
               <div className="ml-3 flex-grow">
-                <h3 className="text-sm font-medium">{insight.title}</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">{insight.title}</h3>
+                  {insight.detail && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => toggleInsightDetail(insight.id)}
+                    >
+                      <Info className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  )}
+                </div>
                 <p className="mt-1 text-sm text-gray-600">{insight.description}</p>
-                <div className="mt-2 text-xs text-gray-500">{insight.time}</div>
+                
+                {expandedInsight === insight.id && insight.detail && (
+                  <div className="mt-3 p-3 bg-white bg-opacity-50 rounded text-sm text-gray-700 animate-fade-in">
+                    {insight.detail}
+                    <div className="mt-2 flex justify-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs h-7"
+                        onClick={() => handleShareInsight(insight)}
+                      >
+                        <Share2 className="h-3 w-3 mr-1" />
+                        Share with Doctor
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">{insight.time}</span>
+                  {insight.type === 'warning' && (
+                    <span className="text-xs text-orange-600 font-medium">Action recommended</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
