@@ -1,4 +1,4 @@
-# Welcome to your Flora-sense project
+# Welcome to your Flora-sense Health Dashboard project
 
 ## Project info
 
